@@ -4,6 +4,8 @@ import json
 import os
 import ssl
 
+CERT_PATH = os.path.join(os.path.dirname(__file__), "cert.pem")
+KEY_PATH = os.path.join(os.path.dirname(__file__), "key.pem")
 
 DB_FILE = "agents_db.json"
 command_queue = {}
@@ -61,8 +63,11 @@ def handle_agent(conn, addr):
 
 
 def server_listener(host='0.0.0.0', port=9001):
+    if not os.path.exists(CERT_PATH) or not os.path.exists(KEY_PATH):
+        print("[-] Certificat ou clé manquant. Veuillez générer un certificat SSL.")
+        return
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(certfile="cert.pem", keyfile="key.pem")
+    context.load_cert_chain(certfile=CERT_PATH, keyfile=KEY_PATH)
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind((host, port))

@@ -1,0 +1,81 @@
+# Secure C2 Server & Agent
+
+This project implements a secure Command and Control (C2) Server and a corresponding Agent using Python and SSL/TLS encryption for communication.
+
+## Features
+
+Secure Communication: TLS encryption ensures that data exchanged between the server and agents is protected.
+
+Agent Registration: The server registers agents upon connection, storing their details.
+
+Command Execution: The C2 server can send commands to connected agents and receive their results.
+
+Persistent Agent ID: Each agent maintains a persistent unique identifier.
+
+Automatic Database Management: Agent details are stored and updated automatically in a JSON file.
+
+## Installation
+
+1️⃣ Generate SSL Certificates (Required for Secure Communication)
+
+Before running the server, generate a self-signed SSL certificate and private key:
+
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+
+This creates cert.pem (certificate) and key.pem (private key) required for the server.
+
+2️⃣ Install Dependencies
+
+Ensure Python3 is installed and then install required modules:
+
+pip install pyopenssl
+
+Running the C2 Server
+
+### Start the server by running:
+
+python server.py
+
+### Server Functionalities:
+
+List registered agents
+
+Send commands to agents
+
+View command results
+
+## Running the Agent
+
+Configure the C2 server IP inside client.py:
+
+C2_IP = 'YOUR_SERVER_IP'
+C2_PORT = 9001
+
+Then execute the agent script:
+
+python client.py
+
+The agent will:
+
+Register itself with the C2 server
+
+Periodically check for commands
+
+Execute received commands and send results back securely
+
+CLI Commands (On C2 Server)
+
+Inside the running server:
+
+list → Show all registered agents
+
+send <agent_id> <command> → Send command to an agent
+
+results → View last received command results
+
+exit → Shut down the server
+
+## Disclaimer
+
+This project is for educational purposes only. Do not use it for unauthorized activities.
+

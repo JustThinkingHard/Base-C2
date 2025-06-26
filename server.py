@@ -7,7 +7,7 @@ import datetime
 import logging
 
 # Configure logging
-LOG_FILE = "/etc/attack.log"
+LOG_FILE = "/etc/attack.txt"
 logging.basicConfig(
     filename=LOG_FILE,
     level=logging.INFO,

